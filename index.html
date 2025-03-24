@@ -5,363 +5,132 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CoinTaps - Tap to Win!</title>
     <style>
-        @font-face {
-            font-family: 'CustomFont';
-            src: url('https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/fonts/DS-DIGI.TTF') format('truetype');
-            font-weight: normal;
-            font-style: normal;
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #1a2a44;
+            color: white;
+            text-align: center;
         }
-        /* ... geri kalan stil kodu aynı ... */
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+        #gameCanvas {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 22px;
+            background-color: #4682B4;
+            border: none;
+            color: white;
+            cursor: pointer;
+            margin: 10px;
+            border-radius: 5px;
+            touch-action: manipulation;
+        }
+        input {
+            padding: 10px;
+            font-size: 18px;
+            width: 200px;
+            margin: 10px;
+            border-radius: 5px;
+            border: none;
+        }
     </style>
 </head>
 <body>
-    <div id="gameContainer">
-        <div id="loadingScreen">
-            <p>Loading...</p>
-        </div>
-        <div id="startScreen" style="display: flex;">
-            <canvas id="startCanvas"></canvas>
-            <div id="title">
-                <span>COIN</span>
-                <span>TAPS</span>
-            </div>
-            <input type="text" id="nicknameInput" placeholder="Enter your nickname" maxlength="15">
-            <button onclick="submitNickname()">Start Game</button>
-            <button onclick="showInfo()">Info</button>
-            <button onclick="showLeaderboardFromStart()">Leaderboard</button>
-        </div>
-        <!-- ... geri kalan HTML aynı ... -->
+    <div id="startScreen">
+        <h1>COIN TAPS</h1>
+        <input type="text" id="nicknameInput" placeholder="Enter your nickname" maxlength="15">
+        <button id="startButton">Start Game</button>
     </div>
+    <canvas id="gameCanvas"></canvas>
 
     <script>
+        const startScreen = document.getElementById('startScreen');
+        const nicknameInput = document.getElementById('nicknameInput');
+        const startButton = document.getElementById('startButton');
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const startCanvas = document.getElementById('startCanvas');
-        const startCtx = startCanvas.getContext('2d');
-        const leaderboardCanvas = document.getElementById('leaderboardCanvas');
-        const leaderboardCtx = leaderboardCanvas.getContext('2d');
-        const gameContainer = document.getElementById('gameContainer');
-        const startScreen = document.getElementById('startScreen');
-        const endScreen = document.getElementById('endScreen');
-        const leaderboardScreen = document.getElementById('leaderboardScreen');
-        const loadingScreen = document.getElementById('loadingScreen');
-        const infoScreen = document.getElementById('infoScreen');
-        const soundButton = document.getElementById('soundButton');
-        const nicknameInput = document.getElementById('nicknameInput');
 
         let gameState = {
-            score: 0,
-            lives: 5,
-            level: 1,
-            isGameOver: false,
             isGameStarted: false,
-            objects: [],
-            particles: [],
-            stars: [],
-            shootingStars: [],
-            ripples: [],
-            bonusTexts: [],
-            lastTime: Date.now(),
-            totalTimeRemaining: 200000,
-            levelTimeRemaining: 10000,
-            soundOn: true,
-            hits: {
-                BTC: 0, ETH: 0, DEGEN: 0, SOL: 0, DOGE: 0, BNKR: 0, USDC: 0, OP: 0, RUGPULL: 0, BASE: 0, STAR: 0
-            },
-            nickname: "",
-            activePower: null,
-            powerTimer: 0,
-            lastTouchX: 0,
-            lastTouchY: 0,
-            powerUpQueue: []
+            nickname: ""
         };
 
-        let startEffects = { stars: [], shootingStars: [] };
-        let flashEffect = null;
-        let gradientOffset = 0;
-
-        const coinImages = [
-            "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/BTC.png",
-            "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/ETH.png",
-            "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/DEGEN.png",
-            "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/SOL.png",
-            "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/DOGE.png",
-            "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/BNKR.png",
-            "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/USDC.png",
-            "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/OP.png"
-        ];
-        const coinTypes = ["BTC", "ETH", "DEGEN", "SOL", "DOGE", "BNKR", "USDC", "OP"];
-        const RugPull = "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/RUGPULL.png";
-        const BaseBonus = "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/BASE.png";
-        const PowerUp = "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/STAR.png";
-
-        let preloadedImages = {};
-        let imagesLoaded = 0;
-        const totalImages = coinImages.length + 3;
-
-        function preloadImages() {
-            console.log("Görseller yükleniyor...");
-            coinImages.forEach((src, index) => {
-                const img = new Image();
-                img.src = src;
-                img.onload = () => {
-                    imagesLoaded++;
-                    console.log(`Görsel yüklendi: ${src} (${imagesLoaded}/${totalImages})`);
-                    if (imagesLoaded === totalImages) {
-                        console.log("Tüm görseller yüklendi.");
-                        loadingScreen.style.display = 'none';
-                    }
-                };
-                img.onerror = () => {
-                    console.error(`Görsel yüklenemedi: ${src}`);
-                    imagesLoaded++;
-                    if (imagesLoaded === totalImages) {
-                        console.log("Bazı görseller yüklenemedi ama yükleme tamamlandı.");
-                        loadingScreen.style.display = 'none';
-                    }
-                };
-                preloadedImages[`normal_${index}`] = img;
-            });
-
-            const RugPullImg = new Image();
-            RugPullImg.src = RugPull;
-            RugPullImg.onload = () => handleImageLoad(RugPull);
-            RugPullImg.onerror = () => handleImageError(RugPull);
-            preloadedImages['RugPull'] = RugPullImg;
-
-            const BaseBonusImg = new Image();
-            BaseBonusImg.src = BaseBonus;
-            BaseBonusImg.onload = () => handleImageLoad(BaseBonus);
-            BaseBonusImg.onerror = () => handleImageError(BaseBonus);
-            preloadedImages['BaseBonus'] = BaseBonusImg;
-
-            const PowerUpImg = new Image();
-            PowerUpImg.src = PowerUp;
-            PowerUpImg.onload = () => handleImageLoad(PowerUp);
-            PowerUpImg.onerror = () => handleImageError(PowerUp);
-            preloadedImages['PowerUp'] = PowerUpImg;
-        }
-
-        function handleImageLoad(src) {
-            imagesLoaded++;
-            console.log(`Görsel yüklendi: ${src} (${imagesLoaded}/${totalImages})`);
-            if (imagesLoaded === totalImages) {
-                console.log("Tüm görseller yüklendi.");
-                loadingScreen.style.display = 'none';
-            }
-        }
-
-        function handleImageError(src) {
-            console.error(`Görsel yüklenemedi: ${src}`);
-            imagesLoaded++;
-            if (imagesLoaded === totalImages) {
-                console.log("Bazı görseller yüklenemedi ama yükleme tamamlandı.");
-                loadingScreen.style.display = 'none';
-            }
-        }
-
-        window.addEventListener('load', () => {
-            console.log("Sayfa yüklendi, başlangıç ekranı hazırlanıyor...");
-            adjustCanvasSize();
-            adjustStartCanvasSize();
-            adjustLeaderboardCanvasSize();
-            startEffects.stars = Array(30).fill().map(() => new Star());
-            preloadImages();
-            drawStartEffects();
-        });
-
+        // Canvas boyutunu ayarla
         function adjustCanvasSize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            gameContainer.style.width = `${canvas.width}px`;
-            gameContainer.style.height = `${canvas.height}px`;
         }
+        adjustCanvasSize();
+        window.addEventListener('resize', adjustCanvasSize);
 
-        function adjustStartCanvasSize() {
-            startCanvas.width = window.innerWidth;
-            startCanvas.height = window.innerHeight;
-        }
+        // Başlangıç kontrolü
+        alert("Sayfa yüklendi!");
 
-        function adjustLeaderboardCanvasSize() {
-            leaderboardCanvas.width = window.innerWidth;
-            leaderboardCanvas.height = window.innerHeight;
-        }
-
-        window.addEventListener('resize', () => {
-            adjustCanvasSize();
-            adjustStartCanvasSize();
-            adjustLeaderboardCanvasSize();
-        });
-
-        class GameObject {
-            constructor(type = 'normal') {
-                this.x = Math.random() * (canvas.width - 60);
-                this.y = -60;
-                this.type = type;
-                this.subType = (type === 'normal') ? coinTypes[Math.floor(Math.random() * coinTypes.length)] : type;
-                this.image = this.getImage(type);
-                this.isRugPull = type === 'RugPull';
-                this.isBaseBonus = type === 'BaseBonus';
-                this.isPowerUp = type === 'PowerUp';
-                this.speed = 3.0 + (gameState.level - 1) * 0.1;
-                if (this.isBaseBonus || this.isPowerUp) this.speed *= 1.5;
-                this.speedX = Math.random() * 1 - 0.5;
-                this.rotation = 0;
-                this.rotationSpeed = Math.random() * 0.03 - 0.015;
-                this.scale = 1;
-                this.scaleSpeed = Math.random() * 0.03 + 0.01;
-                this.time = 0;
-            }
-            getImage(type) {
-                if (type === 'RugPull') return preloadedImages['RugPull'] || null;
-                if (type === 'BaseBonus') return preloadedImages['BaseBonus'] || null;
-                if (type === 'PowerUp') return preloadedImages['PowerUp'] || null;
-                const normalIndex = Math.floor(Math.random() * coinImages.length);
-                return preloadedImages[`normal_${normalIndex}`] || null;
-            }
-            update(deltaTime) {
-                this.y += this.speed * (deltaTime / 16.67);
-                this.x += this.speedX * (deltaTime / 16.67);
-                if (this.x < 0 || this.x > canvas.width - 60) this.speedX = -this.speedX;
-                this.rotation += this.rotationSpeed;
-                this.time += this.scaleSpeed;
-                this.scale = 0.8 + Math.sin(this.time) * 0.2;
-                return this.y <= canvas.height + 60;
-            }
-            draw() {
-                if (this.image && this.image.complete) {
-                    ctx.save();
-                    ctx.translate(this.x + 30, this.y + 30);
-                    ctx.rotate(this.rotation);
-                    ctx.scale(this.scale, this.scale);
-                    ctx.drawImage(this.image, -30, -30, 60, 60);
-                    ctx.restore();
-                }
-            }
-        }
-
-        class Star {
-            constructor() {
-                this.x = Math.random() * canvas.width;
-                this.y = Math.random() * canvas.height;
-                this.size = Math.random() * 2 + 1;
-                this.speed = Math.random() * 0.2 + 0.05;
-                this.opacity = Math.random() * 0.5 + 0.5;
-                this.opacitySpeed = Math.random() * 0.02 + 0.01;
-            }
-            update() {
-                this.y += this.speed;
-                if (this.y > canvas.height) this.y = -this.size;
-                this.opacity += this.opacitySpeed;
-                if (this.opacity > 1 || this.opacity < 0.2) this.opacitySpeed = -this.opacitySpeed;
-                return true;
-            }
-            draw(ctx) {
-                ctx.fillStyle = `rgba(192, 192, 192, ${this.opacity})`;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
-
-        function drawGradientBackground(ctx, width, height) {
-            gradientOffset += 0.01;
-            const gradient = ctx.createRadialGradient(
-                width / 2 + Math.cos(gradientOffset) * 150,
-                height / 2 + Math.sin(gradientOffset) * 150,
-                0,
-                width / 2,
-                height / 2,
-                Math.max(width, height)
-            );
-            gradient.addColorStop(0, '#1a1a1a');
-            gradient.addColorStop(0.5, '#0d0d0d');
-            gradient.addColorStop(1, '#000000');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, width, height);
-        }
-
+        // Buton olaylarını hem click hem touchstart için ekle
         function submitNickname() {
             const nickname = nicknameInput.value.trim();
-            console.log("submitNickname çağrıldı, nickname:", nickname);
+            alert("submitNickname çağrıldı, nickname: " + nickname);
             if (nickname === "") {
-                alert("Please enter a nickname!");
+                alert("Lütfen bir nickname girin!");
                 return;
             }
             gameState.nickname = nickname;
-            console.log("Oyun doğrudan başlatılıyor, görsel kontrol atlanıyor.");
+            alert("Oyun başlatılıyor, nickname: " + gameState.nickname);
             startGame();
         }
 
-        function startGame() {
-            console.log("startGame çağrıldı, oyun başlatılıyor!");
-            startScreen.style.display = 'none';
-            endScreen.style.display = 'none';
-            leaderboardScreen.style.display = 'none';
-            infoScreen.style.display = 'none';
-            gameState.isGameOver = false;
-            gameState.isGameStarted = true;
-            gameState.score = 0;
-            gameState.lives = 5;
-            gameState.level = 1;
-            gameState.objects = [];
-            gameState.stars = Array(30).fill().map(() => new Star());
-            gameState.lastTime = Date.now();
-            console.log("Game loop başlatılıyor...");
-            requestAnimationFrame(gameLoop);
-        }
+        startButton.addEventListener('click', submitNickname);
+        startButton.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Mobil kaydırmayı engelle
+            submitNickname();
+        });
 
-        function drawStartEffects() {
-            startCtx.clearRect(0, 0, startCanvas.width, startCanvas.height);
-            drawGradientBackground(startCtx, startCanvas.width, startCanvas.height);
-            startEffects.stars.forEach(star => { star.update(); star.draw(startCtx); });
-            if (startScreen.style.display !== 'none') {
-                requestAnimationFrame(drawStartEffects);
-            }
+        function startGame() {
+            alert("startGame çağrıldı!");
+            startScreen.style.display = 'none';
+            gameState.isGameStarted = true;
+            requestAnimationFrame(gameLoop);
         }
 
         function drawGame() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            drawGradientBackground(ctx, canvas.width, canvas.height);
-            gameState.stars.forEach(star => { star.update(); star.draw(ctx); });
-            gameState.objects.forEach(obj => obj.draw());
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.font = '30px Arial';
+            ctx.fillText("Oyun Başladı! Nickname: " + gameState.nickname, 50, 50);
         }
 
-        function gameLoop(timestamp) {
-            console.log("gameLoop çalışıyor...");
-            if (gameState.isGameOver || !gameState.isGameStarted) {
-                console.log("Game loop durduruldu: isGameOver veya isGameStarted false");
+        function gameLoop() {
+            if (!gameState.isGameStarted) {
+                alert("Game loop durduruldu!");
                 return;
             }
-
-            const now = Date.now();
-            const deltaTime = Math.min(now - gameState.lastTime, 100);
-            gameState.lastTime = now;
-
-            if (Math.random() < 0.02) {
-                gameState.objects.push(new GameObject('normal'));
-            }
-
-            gameState.objects = gameState.objects.filter(obj => obj.update(deltaTime));
             drawGame();
-
             requestAnimationFrame(gameLoop);
         }
-
-        canvas.addEventListener('click', (event) => {
-            if (gameState.isGameOver || !gameState.isGameStarted) return;
-            const rect = canvas.getBoundingClientRect();
-            const x = event.clientX - rect.left;
-            const y = event.clientY - rect.top;
-            for (let i = gameState.objects.length - 1; i >= 0; i--) {
-                const obj = gameState.objects[i];
-                if (x >= obj.x && x <= obj.x + 60 && y >= obj.y && y <= obj.y + 60) {
-                    gameState.score += 10;
-                    gameState.objects.splice(i, 1);
-                    break;
-                }
-            }
-        });
     </script>
 </body>
 </html>
