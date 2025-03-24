@@ -9,15 +9,13 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
             height: 100vh;
             background-color: #1a2a44;
             color: white;
             text-align: center;
+            font-family: Arial, sans-serif;
         }
-        #startScreen {
+        #startScreen, #endScreen, #infoScreen {
             position: absolute;
             top: 0;
             left: 0;
@@ -27,15 +25,27 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            z-index: 10;
+            background-color: rgba(0, 0, 0, 0.8);
         }
-        #gameCanvas {
-            width: 100%;
-            height: 100%;
-            position: absolute;
-            top: 0;
-            left: 0;
+        #startScreen { z-index: 1; }
+        #gameCanvas { 
+            width: 100%; 
+            height: 100%; 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            display: none; 
+            z-index: 2; 
         }
+        #startCanvas { 
+            width: 100%; 
+            height: 100%; 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            z-index: 0; 
+        }
+        #endScreen, #infoScreen { z-index: 3; display: none; }
         button {
             padding: 15px 30px;
             font-size: 22px;
@@ -55,15 +65,53 @@
             border-radius: 5px;
             border: none;
         }
+        #title {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        #title span {
+            display: block;
+            color: #FFD700;
+        }
+        #infoContent {
+            font-size: 18px;
+            padding: 20px;
+        }
+        #infoContent img {
+            width: 30px;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
     </style>
 </head>
 <body>
     <div id="startScreen">
-        <h1>COIN TAPS</h1>
+        <canvas id="startCanvas"></canvas>
+        <div id="title">
+            <span>COIN</span>
+            <span>TAPS</span>
+        </div>
         <input type="text" id="nicknameInput" placeholder="Enter your nickname" maxlength="15">
         <button id="startButton">Start Game</button>
+        <button onclick="showInfo()">Info</button>
     </div>
     <canvas id="gameCanvas"></canvas>
+    <div id="endScreen">
+        <h1>Game Over</h1>
+        <p id="finalScore"></p>
+        <button onclick="restartGame()">Restart</button>
+        <button onclick="backToStart()">Main Menu</button>
+    </div>
+    <div id="infoScreen">
+        <h2>Game Rules</h2>
+        <div id="infoContent">
+            <p><img src="https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/BTC.png"> Tap coins to earn points (+10)</p>
+            <p><img src="https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/RUGPULL.png"> Avoid RugPulls (-100, -1 life)</p>
+            <p><img src="https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/BASE.png"> Catch BaseBonus for bonus (+250)</p>
+            <p><img src="https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/STAR.png"> Grab PowerUps for special effects (+50)</p>
+        </div>
+        <button onclick="hideInfo()">Close</button>
+    </div>
 
     <script>
         const startScreen = document.getElementById('startScreen');
@@ -71,66 +119,330 @@
         const startButton = document.getElementById('startButton');
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        const startCanvas = document.getElementById('startCanvas');
+        const startCtx = startCanvas.getContext('2d');
+        const endScreen = document.getElementById('endScreen');
+        const finalScore = document.getElementById('finalScore');
+        const infoScreen = document.getElementById('infoScreen');
+
+        // Görseller
+        const coinImages = [
+            "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/BTC.png",
+            "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/ETH.png",
+            "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/DEGEN.png",
+            "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/SOL.png",
+            "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/DOGE.png",
+            "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/BNKR.png",
+            "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/USDC.png",
+            "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/OP.png"
+        ];
+        const coinTypes = ["BTC", "ETH", "DEGEN", "SOL", "DOGE", "BNKR", "USDC", "OP"];
+        const RugPull = "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/RUGPULL.png";
+        const BaseBonus = "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/BASE.png";
+        const PowerUp = "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/images/STAR.png";
+
+        // Sesler
+        const normalSound = new Audio("https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/sounds/COIN.wav");
+        const rugPullSound = new Audio("https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/sounds/RUGPULL.wav");
+        const baseBonusSound = new Audio("https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/sounds/BONUS.wav");
+        const powerUpSound = new Audio("https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/sounds/BONUS.wav");
+        const backgroundMusic = new Audio("https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/public/assets/sounds/BACKGROUND.mp3");
+        backgroundMusic.loop = true;
+        backgroundMusic.volume = 0.5;
+
+        let preloadedImages = {};
+        let imagesLoaded = 0;
+        const totalImages = coinImages.length + 3;
 
         let gameState = {
             isGameStarted: false,
-            nickname: ""
+            isGameOver: false,
+            nickname: "",
+            score: 0,
+            lives: 5,
+            level: 1,
+            objects: [],
+            stars: [],
+            hits: { BTC: 0, ETH: 0, DEGEN: 0, SOL: 0, DOGE: 0, BNKR: 0, USDC: 0, OP: 0, RUGPULL: 0, BASE: 0, STAR: 0 }
         };
 
-        // Canvas boyutunu ayarla
+        let startEffects = { stars: [] };
+
         function adjustCanvasSize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
+            startCanvas.width = window.innerWidth;
+            startCanvas.height = window.innerHeight;
         }
         adjustCanvasSize();
         window.addEventListener('resize', adjustCanvasSize);
 
-        // Başlangıç kontrolü
-        alert("Sayfa yüklendi!");
+        function preloadImages() {
+            coinImages.forEach((src, index) => {
+                const img = new Image();
+                img.src = src;
+                img.onload = () => handleImageLoad(src);
+                img.onerror = () => handleImageError(src);
+                preloadedImages[`normal_${index}`] = img;
+            });
 
-        // Buton olaylarını hem click hem touchstart için ekle
+            const rugPullImg = new Image();
+            rugPullImg.src = RugPull;
+            rugPullImg.onload = () => handleImageLoad(RugPull);
+            rugPullImg.onerror = () => handleImageError(RugPull);
+            preloadedImages['RugPull'] = rugPullImg;
+
+            const baseBonusImg = new Image();
+            baseBonusImg.src = BaseBonus;
+            baseBonusImg.onload = () => handleImageLoad(BaseBonus);
+            baseBonusImg.onerror = () => handleImageError(BaseBonus);
+            preloadedImages['BaseBonus'] = baseBonusImg;
+
+            const powerUpImg = new Image();
+            powerUpImg.src = PowerUp;
+            powerUpImg.onload = () => handleImageLoad(PowerUp);
+            powerUpImg.onerror = () => handleImageError(PowerUp);
+            preloadedImages['PowerUp'] = powerUpImg;
+        }
+
+        function handleImageLoad(src) {
+            imagesLoaded++;
+            if (imagesLoaded === totalImages) {
+                // Tüm görseller yüklendi
+            }
+        }
+
+        function handleImageError(src) {
+            imagesLoaded++;
+            if (imagesLoaded === totalImages) {
+                // Hata olsa bile devam et
+            }
+        }
+
+        preloadImages();
+
+        class Star {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2 + 1;
+                this.speed = Math.random() * 0.2 + 0.05;
+                this.opacity = Math.random() * 0.5 + 0.5;
+                this.opacitySpeed = Math.random() * 0.02 + 0.01;
+            }
+            update() {
+                this.y += this.speed;
+                if (this.y > canvas.height) this.y = -this.size;
+                this.opacity += this.opacitySpeed;
+                if (this.opacity > 1 || this.opacity < 0.2) this.opacitySpeed = -this.opacitySpeed;
+                return true;
+            }
+            draw(ctx) {
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.opacity})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        class GameObject {
+            constructor(type = 'normal') {
+                this.x = Math.random() * (canvas.width - 60);
+                this.y = -60;
+                this.type = type;
+                this.subType = (type === 'normal') ? coinTypes[Math.floor(Math.random() * coinTypes.length)] : type;
+                this.image = this.getImage(type);
+                this.isRugPull = type === 'RugPull';
+                this.isBaseBonus = type === 'BaseBonus';
+                this.isPowerUp = type === 'PowerUp';
+                this.speed = 3 + (gameState.level - 1) * 0.1;
+                if (this.isBaseBonus || this.isPowerUp) this.speed *= 1.5;
+                this.size = 60;
+            }
+            getImage(type) {
+                if (type === 'RugPull') return preloadedImages['RugPull'];
+                if (type === 'BaseBonus') return preloadedImages['BaseBonus'];
+                if (type === 'PowerUp') return preloadedImages['PowerUp'];
+                const index = Math.floor(Math.random() * coinImages.length);
+                return preloadedImages[`normal_${index}`];
+            }
+            update() {
+                this.y += this.speed;
+                return this.y <= canvas.height + this.size;
+            }
+            draw() {
+                if (this.image && this.image.complete) {
+                    ctx.drawImage(this.image, this.x, this.y, this.size, this.size);
+                } else {
+                    ctx.fillStyle = this.isRugPull ? 'red' : this.isBaseBonus ? 'blue' : this.isPowerUp ? 'yellow' : 'green';
+                    ctx.fillRect(this.x, this.y, this.size, this.size);
+                }
+            }
+        }
+
+        window.addEventListener('load', () => {
+            startEffects.stars = Array(30).fill().map(() => new Star());
+            drawStartEffects();
+        });
+
+        function drawStartEffects() {
+            startCtx.fillStyle = '#000';
+            startCtx.fillRect(0, 0, startCanvas.width, startCanvas.height);
+            startEffects.stars.forEach(star => { star.update(); star.draw(startCtx); });
+            if (startScreen.style.display !== 'none') {
+                requestAnimationFrame(drawStartEffects);
+            }
+        }
+
         function submitNickname() {
             const nickname = nicknameInput.value.trim();
-            alert("submitNickname çağrıldı, nickname: " + nickname);
             if (nickname === "") {
                 alert("Lütfen bir nickname girin!");
                 return;
             }
             gameState.nickname = nickname;
-            alert("Oyun başlatılıyor, nickname: " + gameState.nickname);
             startGame();
         }
 
         startButton.addEventListener('click', submitNickname);
         startButton.addEventListener('touchstart', (e) => {
-            e.preventDefault(); // Mobil kaydırmayı engelle
+            e.preventDefault();
             submitNickname();
         });
 
         function startGame() {
-            alert("startGame çağrıldı!");
             startScreen.style.display = 'none';
+            canvas.style.display = 'block';
+            endScreen.style.display = 'none';
+            infoScreen.style.display = 'none';
             gameState.isGameStarted = true;
+            gameState.isGameOver = false;
+            gameState.score = 0;
+            gameState.lives = 5;
+            gameState.level = 1;
+            gameState.objects = [];
+            gameState.stars = Array(30).fill().map(() => new Star());
+            gameState.hits = { BTC: 0, ETH: 0, DEGEN: 0, SOL: 0, DOGE: 0, BNKR: 0, USDC: 0, OP: 0, RUGPULL: 0, BASE: 0, STAR: 0 };
+            backgroundMusic.play().catch(error => {
+                console.error("Arka plan müziği oynatılamadı:", error);
+            });
             requestAnimationFrame(gameLoop);
+        }
+
+        function restartGame() {
+            startGame();
+        }
+
+        function backToStart() {
+            endScreen.style.display = 'none';
+            startScreen.style.display = 'flex';
+            backgroundMusic.pause();
+            drawStartEffects();
+        }
+
+        function showInfo() {
+            infoScreen.style.display = 'flex';
+            startScreen.style.display = 'none';
+        }
+
+        function hideInfo() {
+            infoScreen.style.display = 'none';
+            startScreen.style.display = 'flex';
+            drawStartEffects();
         }
 
         function drawGame() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#1a1a1a';
+            ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+            gameState.stars.forEach(star => { star.update(); star.draw(ctx); });
             ctx.fillStyle = 'white';
-            ctx.font = '30px Arial';
-            ctx.fillText("Oyun Başladı! Nickname: " + gameState.nickname, 50, 50);
+            ctx.font = '20px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText("Score: " + gameState.score, 10, 30);
+            ctx.fillText("Lives: " + gameState.lives, 10, 60);
+            ctx.fillText("Level: " + gameState.level, 10, 90);
+            ctx.fillText("Nickname: " + gameState.nickname, 10, 120);
+
+            gameState.objects.forEach(obj => obj.draw());
         }
 
         function gameLoop() {
-            if (!gameState.isGameStarted) {
-                alert("Game loop durduruldu!");
+            if (!gameState.isGameStarted || gameState.isGameOver) {
+                backgroundMusic.pause();
                 return;
             }
+
+            if (Math.random() < 0.02) {
+                gameState.objects.push(new GameObject('normal'));
+            }
+            if (Math.random() < 0.005) {
+                gameState.objects.push(new GameObject('RugPull'));
+            }
+            if (Math.random() < 0.003) {
+                gameState.objects.push(new GameObject('BaseBonus'));
+            }
+            if (Math.random() < 0.002) {
+                gameState.objects.push(new GameObject('PowerUp'));
+            }
+
+            gameState.objects = gameState.objects.filter(obj => obj.update());
+
+            if (gameState.score >= gameState.level * 100) {
+                gameState.level++;
+            }
+
             drawGame();
+
+            if (gameState.lives <= 0) {
+                endGame();
+                return;
+            }
+
             requestAnimationFrame(gameLoop);
         }
+
+        function endGame() {
+            gameState.isGameOver = true;
+            gameState.isGameStarted = false;
+            endScreen.style.display = 'flex';
+            finalScore.textContent = `Final Score: ${gameState.score}`;
+            backgroundMusic.pause();
+        }
+
+        canvas.addEventListener('touchstart', (e) => {
+            if (!gameState.isGameStarted || gameState.isGameOver) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+
+            for (let i = gameState.objects.length - 1; i >= 0; i--) {
+                const obj = gameState.objects[i];
+                if (x >= obj.x && x <= obj.x + obj.size && y >= obj.y && y <= obj.y + obj.size) {
+                    if (obj.isRugPull) {
+                        gameState.score -= 100;
+                        gameState.lives--;
+                        gameState.hits.RUGPULL++;
+                        rugPullSound.play();
+                    } else if (obj.isBaseBonus) {
+                        gameState.score += 250;
+                        gameState.hits.BASE++;
+                        baseBonusSound.play();
+                    } else if (obj.isPowerUp) {
+                        gameState.score += 50;
+                        gameState.hits.STAR++;
+                        powerUpSound.play();
+                    } else {
+                        gameState.score += 10;
+                        gameState.hits[obj.subType]++;
+                        normalSound.play();
+                    }
+                    gameState.objects.splice(i, 1);
+                    break;
+                }
+            }
+        });
     </script>
 </body>
 </html>
