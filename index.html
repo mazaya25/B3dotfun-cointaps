@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CoinTaps - Tap to Win!</title>
-    <!-- Thirdweb CDN -->
-    <script src="https://unpkg.com/thirdweb@5.0.0/dist/thirdweb.js"></script>
     <style>
         @font-face {
             font-family: 'CustomFont';
@@ -198,7 +196,6 @@
                 <span>TAPS</span>
             </div>
             <input type="text" id="nicknameInput" placeholder="Enter your nickname" maxlength="15">
-            <button onclick="connectWallet()">Connect Wallet</button>
             <button onclick="submitNickname()">Start Game</button>
             <button onclick="showInfo()">Info</button>
             <button onclick="showLeaderboardFromStart()">Leaderboard</button>
@@ -231,44 +228,6 @@
     </div>
 
     <script>
-        // Thirdweb Başlatma
-        const { createThirdwebClient, getContract } = Thirdweb;
-        const { defineChain } = Thirdweb.chains;
-        const { connect } = Thirdweb.wallets;
-
-        const client = createThirdwebClient({
-            clientId: "c56665350e6e7c2c77d7e967f3360ff1",
-        });
-
-        // Sepolia Testnet için Sözleşme Tanımlama
-        const scoreContract = getContract({
-            client,
-            chain: defineChain(11155111), // Sepolia Testnet Chain ID
-            address: "0xA2B1b640B51efF5a944d0Fb996eC4CEa2Fcd15bF", // Deploy ettiğin adres
-        });
-
-        // Cüzdan adresi takibi
-        let walletAddress = null;
-
-        // Cüzdan Bağlantı Fonksiyonu
-        async function connectWallet() {
-            try {
-                const wallet = await connect({
-                    client,
-                    chain: defineChain(11155111), // Sepolia Testnet
-                });
-                walletAddress = await wallet.getAddress();
-                gameState.nickname = walletAddress.slice(0, 6) + "..." + walletAddress.slice(-4);
-                nicknameInput.value = gameState.nickname;
-                console.log("Wallet connected:", walletAddress);
-                submitNickname(); // Otomatik oyun başlatma
-            } catch (error) {
-                console.error("Wallet connection failed:", error);
-                alert("Cüzdan bağlantısı başarısız. Lütfen tekrar deneyin.");
-            }
-        }
-
-        // Mevcut Kod
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const startCanvas = document.getElementById('startCanvas');
@@ -326,7 +285,7 @@
         };
 
         let gradientOffset = 0;
-        let milkyWayOffset = 0;
+        let milkyWayOffset = 0; // MilkyWay nabız efekti için
 
         const coinImages = [
             "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/assets/images/BTC.png",
@@ -811,7 +770,7 @@
         function submitNickname() {
             const nickname = nicknameInput.value.trim();
             if (nickname === "") {
-                alert("Please enter a nickname or connect your wallet!");
+                alert("Please enter a nickname!");
                 return;
             }
             gameState.nickname = nickname;
@@ -1002,19 +961,20 @@
             gameState.shootingStars.forEach(star => star.draw(ctx));
             gameState.comets.forEach(comet => { comet.update(); comet.draw(ctx); });
 
+            // MilkyWay çizimi (4x büyüklük ve nabız efekti)
             if (preloadedImages['MilkyWay'] && preloadedImages['MilkyWay'].complete) {
                 const baseWidth = canvas.width * 0.35;
                 const imgWidth = baseWidth * 4;
                 const imgHeight = (preloadedImages['MilkyWay'].height / preloadedImages['MilkyWay'].width) * imgWidth;
                 const imgX = (canvas.width - imgWidth) / 2;
                 const imgY = (canvas.height - imgHeight) / 2;
-                const scale = 1 + Math.sin(milkyWayOffset) * 0.05;
+                const scale = 1 + Math.sin(milkyWayOffset) * 0.05; // Nabız efekti
                 ctx.save();
                 ctx.translate(imgX + imgWidth / 2, imgY + imgHeight / 2);
                 ctx.scale(scale, scale);
                 ctx.drawImage(preloadedImages['MilkyWay'], -imgWidth / 2, -imgHeight / 2, imgWidth, imgHeight);
                 ctx.restore();
-                milkyWayOffset += 0.01;
+                milkyWayOffset += 0.01; // Nabız hızı
             }
 
             if (gameState.activePower === 'slow' && gameState.powerTimer > 0) {
@@ -1227,35 +1187,24 @@
             }
         }
 
-        async function saveScore(score, nickname) {
-            try {
-                let scores = JSON.parse(localStorage.getItem('cointaps_scores') || '[]');
-                const existingScoreIndex = scores.findIndex(entry => entry.nickname === nickname);
-                if (existingScoreIndex !== -1) {
-                    if (scores[existingScoreIndex].score < score) {
-                        scores[existingScoreIndex].score = score;
-                        scores[existingScoreIndex].date = new Date().toLocaleString();
-                    }
-                } else {
-                    scores.push({ score, nickname, date: new Date().toLocaleString() });
+        function saveScore(score, nickname) {
+            let scores = JSON.parse(localStorage.getItem('cointaps_scores') || '[]');
+            const existingScoreIndex = scores.findIndex(entry => entry.nickname === nickname);
+            if (existingScoreIndex !== -1) {
+                if (scores[existingScoreIndex].score < score) {
+                    scores[existingScoreIndex].score = score;
+                    scores[existingScoreIndex].date = new Date().toLocaleString();
                 }
-                scores.sort((a, b) => b.score - a.score);
-                scores = scores.slice(0, 10);
-                localStorage.setItem('cointaps_scores', JSON.stringify(scores));
-
-                if (walletAddress) {
-                    const wallet = await connect({ client });
-                    const tx = await scoreContract.call("saveScore", [nickname, score], {
-                        from: walletAddress,
-                    });
-                    console.log("Score saved to blockchain:", tx);
-                }
-            } catch (error) {
-                console.error("Failed to save score:", error);
+            } else {
+                scores.push({ score, nickname, date: new Date().toLocaleString() });
             }
+            scores.sort((a, b) => b.score - a.score);
+            scores = scores.slice(0, 10);
+            localStorage.setItem('cointaps_scores', JSON.stringify(scores));
+            console.log("Skor yerel olarak kaydedildi:", { nickname, score });
         }
 
-        async function showLeaderboard() {
+        function showLeaderboard() {
             endScreen.style.display = 'none';
             leaderboardScreen.style.display = 'flex';
             startScreen.style.display = 'none';
@@ -1265,29 +1214,11 @@
             drawLeaderboardBackground();
 
             let localScores = JSON.parse(localStorage.getItem('cointaps_scores') || '[]');
-            let blockchainScores = [];
-            try {
-                const scores = await scoreContract.call("getLeaderboard");
-                blockchainScores = scores.map(score => ({
-                    nickname: score.nickname,
-                    score: Number(score.score),
-                    date: new Date(Number(score.timestamp) * 1000).toLocaleString(),
-                }));
-            } catch (error) {
-                console.error("Failed to fetch blockchain scores:", error);
-            }
-
-            const allScores = [...localScores, ...blockchainScores]
-                .sort((a, b) => b.score - a.score)
-                .slice(0, 10);
-
-            leaderboardList.innerHTML = allScores.map((entry, index) => 
-                `<li>${index + 1}. ${entry.nickname}: ${entry.score} - ${entry.date}</li>`
-            ).join('');
-            console.log("Leaderboard updated:", allScores);
+            leaderboardList.innerHTML = localScores.map((entry, index) => `<li>${index + 1}. ${entry.nickname}: ${entry.score} - ${entry.date}</li>`).join('');
+            console.log("Leaderboard güncellendi (yerel):", localScores);
         }
 
-        async function showLeaderboardFromStart() {
+        function showLeaderboardFromStart() {
             startScreen.style.display = 'none';
             leaderboardScreen.style.display = 'flex';
             infoScreen.style.display = 'none';
@@ -1296,25 +1227,8 @@
             drawLeaderboardBackground();
 
             let localScores = JSON.parse(localStorage.getItem('cointaps_scores') || '[]');
-            let blockchainScores = [];
-            try {
-                const scores = await scoreContract.call("getLeaderboard");
-                blockchainScores = scores.map(score => ({
-                    nickname: score.nickname,
-                    score: Number(score.score),
-                    date: new Date(Number(score.timestamp) * 1000).toLocaleString(),
-                }));
-            } catch (error) {
-                console.error("Failed to fetch blockchain scores:", error);
-            }
-
-            const allScores = [...localScores, ...blockchainScores]
-                .sort((a, b) => b.score - a.score)
-                .slice(0, 10);
-
-            leaderboardList.innerHTML = allScores.map((entry, index) => 
-                `<li>${index + 1}. ${entry.nickname}: ${entry.score} - ${entry.date}</li>`
-            ).join('');
+            leaderboardList.innerHTML = localScores.map((entry, index) => `<li>${index + 1}. ${entry.nickname}: ${entry.score} - ${entry.date}</li>`).join('');
+            console.log("Leaderboard güncellendi (yerel):", localScores);
         }
 
         function hideLeaderboard() {
