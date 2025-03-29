@@ -883,7 +883,7 @@
         }
 
         function spawnObject(deltaTime) {
-            const baseSpawnRate = 0.005 + gameState.level * 0.001;
+            const baseSpawnRate = 0.007 + gameState.level * 0.001;
             const spawnMultiplier = 1 + Math.min((gameState.level - 1) * 0.02, 0.5);
             const spawnIncrease = 1.45;
 
@@ -899,7 +899,7 @@
                 console.log("RugPull obje spawn edildi");
             }
 
-            if (Math.random() < baseSpawnRate * 0.075 * spawnMultiplier * spawnIncrease) {
+            if (Math.random() < baseSpawnRate * 0.1 * spawnMultiplier * spawnIncrease) {
                 gameState.objects.push(new GameObject('BaseBonus'));
                 console.log("BaseBonus obje spawn edildi");
             }
