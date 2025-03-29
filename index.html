@@ -205,7 +205,7 @@
             <div id="infoContent">
                 <p><img id="normalCoinIcon" src="https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/assets/images/BTC.png"> Tap coins to earn points (+10)</p>
                 <p><img id="rugPullIcon" src="https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/assets/images/RUGPULL.png"> Avoid RugPulls (-100, -1 life)</p>
-                <p><img id="baseBonusIcon" src="https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/assets/images/BASE.png"> Catch BaseBonus for bonus (+250)</p>
+                <p><img id="baseBonusIcon" src="https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/assets/images/BASE.png"> Catch BaseBonus for bonus (+250, +5s)</p>
                 <p><img id="powerUpIcon" src="https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/assets/images/STAR.png"> Grab PowerUps for special effects</p>
             </div>
             <button onclick="hideInfo()">Close</button>
@@ -262,8 +262,7 @@
             ripples: [],
             bonusTexts: [],
             lastTime: Date.now(),
-            totalTimeRemaining: 200000,
-            levelTimeRemaining: 10000,
+            totalTimeRemaining: 30000, // Başlangıç süresi 30 saniye
             soundOn: true,
             hits: {
                 BTC: 0, ETH: 0, DEGEN: 0, SOL: 0, DOGE: 0, B3: 0, BNKR: 0, TETHER: 0, USDC: 0, OP: 0,
@@ -285,7 +284,7 @@
         };
 
         let gradientOffset = 0;
-        let milkyWayOffset = 0; // MilkyWay nabız efekti için
+        let milkyWayOffset = 0;
 
         const coinImages = [
             "https://raw.githubusercontent.com/mazaya25/B3dotfun-cointaps/main/assets/images/BTC.png",
@@ -489,7 +488,8 @@
                 if (this.isBaseBonus) {
                     gameState.score += 250;
                     gameState.hits.BASE += 1;
-                    gameState.bonusTexts.push(new BonusText(this.x, this.y, "+250"));
+                    gameState.totalTimeRemaining += 5000; // 5 saniye ek süre
+                    gameState.bonusTexts.push(new BonusText(this.x, this.y, "+250 & +5s"));
                     if (gameState.soundOn) BaseBonusSound.play().catch(e => console.error("BaseBonus sound error:", e));
                 } else if (this.isPowerUp) {
                     const powers = ['slow', 'extraLife', 'magnet'];
@@ -812,8 +812,7 @@
             gameState.ripples = [];
             gameState.bonusTexts = [];
             gameState.lastTime = Date.now();
-            gameState.totalTimeRemaining = 200000;
-            gameState.levelTimeRemaining = 10000;
+            gameState.totalTimeRemaining = 30000; // Başlangıç süresi 30 saniye
             gameState.hits = { BTC: 0, ETH: 0, DEGEN: 0, SOL: 0, DOGE: 0, B3: 0, BNKR: 0, TETHER: 0, USDC: 0, OP: 0, RUGPULL: 0, BASE: 0, STAR: 0 };
             gameState.activePower = null;
             gameState.powerTimer = 0;
@@ -838,6 +837,7 @@
             infoScreen.style.display = 'none';
             soundButton.style.display = 'none';
             nicknameInput.value = gameState.nickname;
+            gameState.totalTimeRemaining = 30000; // Başlangıç süresi 30 saniye
             adjustCanvasSize();
             drawStartEffects();
         }
@@ -905,7 +905,7 @@
             }
 
             if (gameState.powerUpQueue.length > 0) {
-                const timeElapsed = 10000 - gameState.levelTimeRemaining;
+                const timeElapsed = 10000 - (gameState.totalTimeRemaining % 10000); // Süre bazlı değil, genel süreye göre
                 if (timeElapsed >= gameState.powerUpQueue[0]) {
                     gameState.objects.push(new GameObject('PowerUp'));
                     console.log("PowerUp obje spawn edildi (sıra)");
@@ -961,20 +961,19 @@
             gameState.shootingStars.forEach(star => star.draw(ctx));
             gameState.comets.forEach(comet => { comet.update(); comet.draw(ctx); });
 
-            // MilkyWay çizimi (4x büyüklük ve nabız efekti)
             if (preloadedImages['MilkyWay'] && preloadedImages['MilkyWay'].complete) {
                 const baseWidth = canvas.width * 0.35;
                 const imgWidth = baseWidth * 4;
                 const imgHeight = (preloadedImages['MilkyWay'].height / preloadedImages['MilkyWay'].width) * imgWidth;
                 const imgX = (canvas.width - imgWidth) / 2;
                 const imgY = (canvas.height - imgHeight) / 2;
-                const scale = 1 + Math.sin(milkyWayOffset) * 0.05; // Nabız efekti
+                const scale = 1 + Math.sin(milkyWayOffset) * 0.05;
                 ctx.save();
                 ctx.translate(imgX + imgWidth / 2, imgY + imgHeight / 2);
                 ctx.scale(scale, scale);
                 ctx.drawImage(preloadedImages['MilkyWay'], -imgWidth / 2, -imgHeight / 2, imgWidth, imgHeight);
                 ctx.restore();
-                milkyWayOffset += 0.01; // Nabız hızı
+                milkyWayOffset += 0.01;
             }
 
             if (gameState.activePower === 'slow' && gameState.powerTimer > 0) {
@@ -1104,7 +1103,8 @@
                     } else if (obj.isBaseBonus) {
                         gameState.score += 250;
                         gameState.hits.BASE += 1;
-                        gameState.bonusTexts.push(new BonusText(obj.x, obj.y, "+250"));
+                        gameState.totalTimeRemaining += 5000; // 5 saniye ek süre
+                        gameState.bonusTexts.push(new BonusText(obj.x, obj.y, "+250 & +5s"));
                         for (let j = 0; j < 30; j++) gameState.particles.push(new Particle(obj.x, obj.y));
                         if (gameState.soundOn) BaseBonusSound.play().catch(e => console.error("BaseBonus sound error:", e));
                     } else if (obj.isPowerUp) {
@@ -1146,7 +1146,6 @@
             const deltaTime = Math.min(now - gameState.lastTime, 100);
             gameState.lastTime = now;
 
-            gameState.levelTimeRemaining -= deltaTime;
             gameState.totalTimeRemaining = Math.max(gameState.totalTimeRemaining - deltaTime, 0);
 
             if (gameState.powerTimer > 0) {
@@ -1157,14 +1156,17 @@
                 }
             }
 
-            console.log(`Game State - Lives: ${gameState.lives}, Total Time: ${gameState.totalTimeRemaining}, Level: ${gameState.level}, Objects: ${gameState.objects.length}, PowerUps Left: ${gameState.powerUpQueue.length}`);
-
-            if (gameState.levelTimeRemaining <= 0) {
-                gameState.level += 1;
-                gameState.levelTimeRemaining = 10000;
-                gameState.powerUpQueue = generatePowerUpQueue();
-                console.log("Seviye yükseldi:", gameState.level, "Yeni PowerUp sırası:", gameState.powerUpQueue);
+            // Seviye artışı: Her 5 BaseBonus'ta seviye artar
+            if (gameState.hits.BASE > 0 && gameState.hits.BASE % 5 === 0) {
+                const currentLevel = Math.floor(gameState.hits.BASE / 5) + 1;
+                if (currentLevel > gameState.level) {
+                    gameState.level = currentLevel;
+                    gameState.powerUpQueue = generatePowerUpQueue();
+                    console.log("Seviye yükseldi:", gameState.level, "Yeni PowerUp sırası:", gameState.powerUpQueue);
+                }
             }
+
+            console.log(`Game State - Lives: ${gameState.lives}, Total Time: ${gameState.totalTimeRemaining}, Level: ${gameState.level}, Objects: ${gameState.objects.length}, PowerUps Left: ${gameState.powerUpQueue.length}`);
 
             spawnObject(deltaTime);
             spawnBackgroundEffects();
@@ -1175,9 +1177,6 @@
 
             if (gameState.lives <= 0) {
                 console.log("Oyun bitti: Canlar sıfırlandı.");
-                endGame();
-            } else if (gameState.level > 20) {
-                console.log("Oyun bitti: Maksimum seviye aşıldı.");
                 endGame();
             } else if (gameState.totalTimeRemaining <= 0) {
                 console.log("Oyun bitti: Süre doldu.");
